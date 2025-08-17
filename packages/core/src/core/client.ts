@@ -35,10 +35,9 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   AuthType,
-  ContentGenerator,
   ContentGeneratorConfig,
-  createContentGenerator,
 } from './contentGenerator.js';
+import { LLMProvider, createLLMProvider } from './llmProvider.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -91,7 +90,7 @@ export function findIndexAfterFraction(
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private contentGenerator?: ContentGenerator;
+  private contentGenerator?: LLMProvider;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -126,15 +125,11 @@ export class GeminiClient {
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
-    this.contentGenerator = await createContentGenerator(
-      contentGeneratorConfig,
-      this.config,
-      this.config.getSessionId(),
-    );
+    this.contentGenerator = createLLMProvider(this.config);
     this.chat = await this.startChat();
   }
 
-  getContentGenerator(): ContentGenerator {
+  getLLMProvider(): LLMProvider {
     if (!this.contentGenerator) {
       throw new Error('Content generator not initialized');
     }
@@ -142,7 +137,7 @@ export class GeminiClient {
   }
 
   getUserTier(): UserTierId | undefined {
-    return this.contentGenerator?.userTier;
+    return this.getLLMProvider()?.userTier;
   }
 
   async addHistory(content: Content) {
@@ -247,7 +242,7 @@ export class GeminiClient {
         : this.generateContentConfig;
       return new GeminiChat(
         this.config,
-        this.getContentGenerator(),
+        this.getLLMProvider(),
         {
           systemInstruction,
           ...generateContentConfigWithThinking,
@@ -569,7 +564,7 @@ export class GeminiClient {
       };
 
       const apiCall = () =>
-        this.getContentGenerator().generateContent(
+        this.getLLMProvider().generateContent(
           {
             model: modelToUse,
             config: {
@@ -680,7 +675,7 @@ export class GeminiClient {
       };
 
       const apiCall = () =>
-        this.getContentGenerator().generateContent(
+        this.getLLMProvider().generateContent(
           {
             model: modelToUse,
             config: requestConfig,
@@ -725,7 +720,7 @@ export class GeminiClient {
     };
 
     const embedContentResponse =
-      await this.getContentGenerator().embedContent(embedModelParams);
+      await this.getLLMProvider().embedContent(embedModelParams);
     if (
       !embedContentResponse.embeddings ||
       embedContentResponse.embeddings.length === 0
@@ -764,7 +759,7 @@ export class GeminiClient {
     const model = this.config.getModel();
 
     const { totalTokens: originalTokenCount } =
-      await this.getContentGenerator().countTokens({
+      await this.getLLMProvider().countTokens({
         model,
         contents: curatedHistory,
       });
@@ -828,7 +823,7 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
 
     const { totalTokens: newTokenCount } =
-      await this.getContentGenerator().countTokens({
+      await this.getLLMProvider().countTokens({
         // model might change after calling `sendMessage`, so we get the newest value from config
         model: this.config.getModel(),
         contents: this.getChat().getHistory(),

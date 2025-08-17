@@ -199,6 +199,7 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  provider?: 'google' | 'local';
 }
 
 export class Config {
@@ -263,6 +264,7 @@ export class Config {
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
+  private readonly provider: 'google' | 'local';
   private initialized: boolean = false;
 
   constructor(params: ConfigParameters) {
@@ -329,6 +331,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.provider = params.provider ?? 'google';
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -442,6 +445,10 @@ export class Config {
 
   setQuotaErrorOccurred(value: boolean): void {
     this.quotaErrorOccurred = value;
+  }
+
+  getProvider(): 'google' | 'local' {
+    return this.provider;
   }
 
   getQuotaErrorOccurred(): boolean {
